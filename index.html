@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eval 03 — LLM Evaluation Frameworks</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0a0a;
+            --bg-card: #0d1117;
+            --bg-code: #161b22;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --accent: #76B900;
+            --accent-dim: #76B90044;
+            --accent-glow: #76B90033;
+            --border: #21262d;
+            --font-display: 'Space Grotesk', sans-serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+            --font-body: 'Inter', sans-serif;
+            --max-width: 900px;
+        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 17px;
+            line-height: 1.7;
+            overflow-x: hidden;
+        }
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem 1.5rem;
+            text-align: center;
+            position: relative;
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        .hero > * { position: relative; z-index: 1; }
+        .series-label {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--accent);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+        }
+        .hero h1 {
+            font-family: var(--font-display);
+            font-size: clamp(2rem, 5vw, 3.2rem);
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.2;
+            margin-bottom: 1rem;
+        }
+        .hero h1 .accent { color: var(--accent); }
+        .hero .subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 640px;
+            margin-bottom: 2rem;
+        }
+        .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: center;
+            margin-bottom: 2.5rem;
+        }
+        .tag {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            background: var(--accent-dim);
+            white-space: nowrap;
+        }
+        .pipeline {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+            margin-bottom: 1rem;
+            max-width: var(--max-width);
+        }
+        .pipeline-step {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            padding: 0.3rem 0.7rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+        .pipeline-arrow { color: var(--accent); font-size: 0.9rem; font-weight: 700; }
+        .slide {
+            min-height: 100vh;
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 4rem 1.5rem;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .slide-number {
+            font-family: var(--font-display);
+            font-size: 5rem;
+            font-weight: 700;
+            color: var(--accent-dim);
+            position: absolute;
+            top: 2rem;
+            right: 1.5rem;
+            line-height: 1;
+            user-select: none;
+        }
+        .slide h2 {
+            font-family: var(--font-display);
+            font-size: 1.9rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 1.5rem;
+            line-height: 1.25;
+        }
+        .slide h3 {
+            font-family: var(--font-display);
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+        .slide p { margin-bottom: 1rem; color: var(--text-secondary); }
+        .slide p strong { color: var(--text-primary); }
+        .slide ul, .slide ol { margin-bottom: 1rem; padding-left: 1.5rem; color: var(--text-secondary); }
+        .slide li { margin-bottom: 0.4rem; }
+        .slide li strong { color: var(--text-primary); }
+        .slide code {
+            font-family: var(--font-mono);
+            font-size: 0.88em;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            padding: 0.05rem 0.35rem;
+            border-radius: 3px;
+            color: #c9d1d9;
+        }
+        .code-block {
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin: 1.25rem 0;
+            overflow: hidden;
+        }
+        .code-header {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--accent);
+            background: rgba(118, 185, 0, 0.08);
+            padding: 0.4rem 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .code-block pre { margin: 0; padding: 1rem; overflow-x: auto; }
+        .code-block code {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: #c9d1d9;
+            background: transparent;
+            border: none;
+            padding: 0;
+        }
+        .kw { color: #ff7b72; }
+        .fn { color: #d2a8ff; }
+        .str { color: #a5d6ff; }
+        .cm { color: #8b949e; font-style: italic; }
+        .num { color: #79c0ff; }
+        .type { color: #ffa657; }
+        .dir { color: #ff7b72; }
+        .mac { color: #ffa657; }
+        .table-wrap {
+            overflow-x: auto;
+            margin: 1.25rem 0;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th {
+            background: var(--bg-code);
+            color: var(--accent);
+            font-weight: 600;
+            text-align: left;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            font-family: var(--font-display);
+            white-space: nowrap;
+        }
+        td {
+            padding: 0.6rem 1rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+        tr:last-child td { border-bottom: none; }
+        tr:nth-child(even) td { background: rgba(13, 17, 23, 0.5); }
+        .diagram-flow {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        .diagram-box {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            text-align: center;
+            white-space: nowrap;
+        }
+        .diagram-box.accent { border-color: var(--accent); color: var(--accent); background: rgba(118, 185, 0, 0.08); }
+        .diagram-box.dim { color: var(--text-secondary); border-color: var(--border); }
+        .diagram-arrow { color: var(--accent); font-size: 1.3rem; font-weight: 700; }
+        .diagram-vertical {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.3rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        .diagram-vertical .diagram-arrow { font-size: 1.1rem; }
+        .hierarchy {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        .hierarchy-level { display: flex; align-items: center; gap: 0.75rem; }
+        .hierarchy-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            min-width: 80px;
+            text-align: right;
+        }
+        .hierarchy-items { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+        .hierarchy-item {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+        .hierarchy-item.accent { border-color: var(--accent); color: var(--accent); background: rgba(118, 185, 0, 0.08); }
+        .diagram-grid {
+            display: grid;
+            gap: 0.75rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        .diagram-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+        .diagram-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+        .diagram-panel {
+            padding: 1rem;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+        }
+        .diagram-panel.accent-border { border-left: 3px solid var(--accent); }
+        .diagram-panel h4 {
+            font-family: var(--font-display);
+            font-size: 1rem;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+        }
+        .diagram-panel p, .diagram-panel ul { font-size: 0.85rem; }
+        .callout {
+            background: var(--bg-card);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 8px 8px 0;
+            padding: 1rem 1.25rem;
+            margin: 1.25rem 0;
+        }
+        .callout p { margin-bottom: 0; }
+        .callout p + p { margin-top: 0.5rem; }
+        .callout .callout-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.3rem;
+        }
+        .contents-list { list-style: none; padding-left: 0; counter-reset: contents; }
+        .contents-list li {
+            counter-increment: contents;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .contents-list li:last-child { border-bottom: none; }
+        .contents-list li::before {
+            content: counter(contents, decimal-leading-zero);
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--accent);
+            min-width: 2rem;
+        }
+        .contents-list a { color: var(--text-primary); text-decoration: none; transition: color 0.2s; }
+        .contents-list a:hover { color: var(--accent); }
+        .footer {
+            text-align: center;
+            padding: 3rem 1.5rem;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--border);
+            max-width: var(--max-width);
+            margin: 0 auto;
+        }
+        .footer a { color: var(--accent); text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
+        .canvas-wrap {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1.25rem 0;
+            overflow-x: auto;
+        }
+        .canvas-wrap canvas, .canvas-wrap svg { display: block; margin: 0 auto; max-width: 100%; }
+        .badge {
+            display: inline-block;
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            padding: 0.1rem 0.45rem;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            vertical-align: middle;
+            margin-left: 0.3rem;
+        }
+        .badge.ok    { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+        .badge.warn  { border-color: #ffa657; color: #ffa657; background: rgba(255,166,87,0.08); }
+        .badge.bad   { border-color: #ff7b72; color: #ff7b72; background: rgba(255,123,114,0.08); }
+        @media (max-width: 640px) {
+            .slide { padding: 3rem 1rem; min-height: auto; }
+            .slide-number { font-size: 3rem; top: 1.5rem; right: 1rem; }
+            .slide h2 { font-size: 1.5rem; }
+            .diagram-grid.cols-2, .diagram-grid.cols-3 { grid-template-columns: 1fr; }
+            .pipeline { gap: 0.15rem; }
+            .pipeline-step { font-size: 0.6rem; padding: 0.2rem 0.4rem; }
+            .hero h1 { font-size: 1.8rem; }
+            table { font-size: 0.78rem; }
+        }
+    </style>
+</head>
+<body>
+<header class="hero">
+    <div class="series-label">LLM Evaluations Series &mdash; Presentation 03</div>
+    <h1>LLM Evaluation <span class="accent">Frameworks</span></h1>
+    <p class="subtitle">Inspect AI, Braintrust, Phoenix, Langfuse, OpenAI Evals, deepeval &mdash; architecture, integration patterns, and a decision matrix for choosing the right tool.</p>
+    <div class="tags">
+        <span class="tag">Inspect AI</span>
+        <span class="tag">Braintrust</span>
+        <span class="tag">Phoenix</span>
+        <span class="tag">Langfuse</span>
+        <span class="tag">OpenAI Evals</span>
+        <span class="tag">deepeval</span>
+        <span class="tag">OTel</span>
+    </div>
+    <div class="pipeline">
+        <span class="pipeline-step">Define Task</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Instrument</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Run Scorers</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Collect Traces</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Review</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Gate CI</span>
+    </div>
+</header>
+
+<section class="slide" id="slide-00">
+    <div class="slide-number">00</div>
+    <h2>Topics We'll Cover</h2>
+    <ul class="contents-list">
+        <li><a href="#slide-01">The Framework Landscape</a></li>
+        <li><a href="#slide-02">Inspect AI (UK AISI) &mdash; Agent Evals, Sandboxed Tools, Scorers</a></li>
+        <li><a href="#slide-03">Braintrust &mdash; Production-Focused, Datasets, Online Evals</a></li>
+        <li><a href="#slide-04">Phoenix (Arize) &mdash; OSS, OTel-Native, Trace &amp; Eval</a></li>
+        <li><a href="#slide-05">Langfuse &mdash; Observability &amp; Eval Bundled</a></li>
+        <li><a href="#slide-06">OpenAI Evals &mdash; Model-Graded, Simple Harness</a></li>
+        <li><a href="#slide-07">deepeval &mdash; Pytest-Style Assertions</a></li>
+        <li><a href="#slide-08">Picking a Framework &mdash; Decision Matrix</a></li>
+        <li><a href="#slide-09">What to Take Away</a></li>
+    </ul>
+</section>
+
+<section class="slide" id="slide-01">
+    <div class="slide-number">01</div>
+    <h2>The Framework Landscape</h2>
+    <p>The LLM eval framework space has fragmented into three overlapping categories. Understanding which category solves your problem prevents tool sprawl.</p>
+
+    <div class="hierarchy">
+        <div class="hierarchy-level">
+            <div class="hierarchy-label">Safety-focused</div>
+            <div class="hierarchy-items">
+                <span class="hierarchy-item accent">Inspect AI</span>
+                <span class="hierarchy-item">HarmBench</span>
+                <span class="hierarchy-item">AISI Tasksets</span>
+            </div>
+        </div>
+        <div class="hierarchy-level">
+            <div class="hierarchy-label">Production eval</div>
+            <div class="hierarchy-items">
+                <span class="hierarchy-item accent">Braintrust</span>
+                <span class="hierarchy-item accent">Langfuse</span>
+                <span class="hierarchy-item">Weights &amp; Biases Weave</span>
+                <span class="hierarchy-item">Arize</span>
+            </div>
+        </div>
+        <div class="hierarchy-level">
+            <div class="hierarchy-label">Obs + eval</div>
+            <div class="hierarchy-items">
+                <span class="hierarchy-item accent">Phoenix (Arize)</span>
+                <span class="hierarchy-item">Langsmith</span>
+                <span class="hierarchy-item">Helicone</span>
+            </div>
+        </div>
+        <div class="hierarchy-level">
+            <div class="hierarchy-label">CI / unit</div>
+            <div class="hierarchy-items">
+                <span class="hierarchy-item accent">deepeval</span>
+                <span class="hierarchy-item accent">OpenAI Evals</span>
+                <span class="hierarchy-item">ragas</span>
+                <span class="hierarchy-item">promptfoo</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="callout">
+        <div class="callout-label">Selection heuristic</div>
+        <p>If your primary concern is <strong>safety and agent capability benchmarking</strong>: Inspect AI. If it is <strong>production monitoring + experiment tracking</strong>: Braintrust or Langfuse. If it is <strong>distributed tracing + lightweight eval</strong>: Phoenix. If it is <strong>CI/CD regression gating</strong>: deepeval or promptfoo. If you are evaluating <strong>OpenAI models</strong> and want no infrastructure: OpenAI Evals harness.</p>
+    </div>
+
+    <p>All six frameworks support Python. Four have TypeScript SDKs. Only Phoenix is <strong>OpenTelemetry-native</strong>. Braintrust and Langfuse have proprietary trace formats but both export to OTLP via adapters. Inspect AI and deepeval are fundamentally <strong>offline eval runners</strong>; the others include online observability components.</p>
+</section>
+
+<section class="slide" id="slide-02">
+    <div class="slide-number">02</div>
+    <h2>Inspect AI (UK AISI) &mdash; Agent Evals, Sandboxed Tools, Scorers</h2>
+    <p>Inspect AI (<code>inspect_ai</code> v0.3+, Python &ge; 3.10) is the UK AI Safety Institute's open-source framework for rigorous capability and safety evaluation. Its design prioritises <strong>reproducibility</strong>, <strong>sandboxed tool execution</strong>, and <strong>composable scorers</strong>.</p>
+
+    <div class="code-block">
+        <div class="code-header">inspect_ai &mdash; minimal task definition</div>
+<pre><code><span class="kw">from</span> <span class="type">inspect_ai</span> <span class="kw">import</span> <span class="fn">task</span>, <span class="fn">eval</span>
+<span class="kw">from</span> <span class="type">inspect_ai.dataset</span> <span class="kw">import</span> <span class="fn">json_dataset</span>
+<span class="kw">from</span> <span class="type">inspect_ai.scorer</span> <span class="kw">import</span> <span class="fn">model_graded_fact</span>, <span class="fn">exact</span>
+<span class="kw">from</span> <span class="type">inspect_ai.solver</span> <span class="kw">import</span> <span class="fn">generate</span>, <span class="fn">chain_of_thought</span>
+<span class="kw">from</span> <span class="type">inspect_ai.model</span>  <span class="kw">import</span> <span class="fn">get_model</span>
+
+<span class="fn">@task</span>
+<span class="kw">def</span> <span class="fn">my_eval</span>():
+    <span class="kw">return</span> {
+        <span class="str">"dataset"</span>: <span class="fn">json_dataset</span>(<span class="str">"evals/factual_qa.jsonl"</span>),
+        <span class="str">"solver"</span>:  [<span class="fn">chain_of_thought</span>(), <span class="fn">generate</span>()],
+        <span class="str">"scorer"</span>:  <span class="fn">model_graded_fact</span>(model=<span class="str">"anthropic/claude-3-5-sonnet-20241022"</span>),
+    }
+
+<span class="cm"># Run:  inspect eval my_task.py --model anthropic/claude-3-opus-20240229</span></code></pre>
+    </div>
+
+    <h3>Key features</h3>
+    <div class="diagram-grid cols-2">
+        <div class="diagram-panel accent-border">
+            <h4>Sandboxed tool execution</h4>
+            <p>Agent evals requiring bash or Python execution run inside Docker containers (<code>sandbox="docker"</code>) or local processes (<code>sandbox="local"</code>). Each sample gets a fresh sandbox. Prevents side-effects from contaminating other samples. Supports <code>inspect sandbox exec</code> CLI for debugging.</p>
+        </div>
+        <div class="diagram-panel accent-border">
+            <h4>Composable scorers</h4>
+            <p>Built-in: <code>exact</code>, <code>includes</code>, <code>regex</code>, <code>model_graded_fact</code>, <code>model_graded_qa</code>, <code>pattern</code>. Custom scorers are Python callables returning <code>Score(value, answer, explanation)</code>. Multiple scorers can be stacked; results are stored per-scorer in the log file.</p>
+        </div>
+    </div>
+
+    <div class="callout">
+        <div class="callout-label">AISI use in practice</div>
+        <p>AISI used Inspect AI for the UK Government's frontier model evaluations (GPT-4o, Gemini Ultra, Claude 3 Opus) published in 2024. The framework runs on their HPC cluster with parallelism via async samplers. Output is a structured <code>.eval</code> log file that can be opened in the Inspect AI web viewer for drill-down review.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-03">
+    <div class="slide-number">03</div>
+    <h2>Braintrust &mdash; Production-Focused, Datasets, Online Evals</h2>
+    <p>Braintrust is a commercial eval platform focused on <strong>experiment tracking</strong> and <strong>online evaluation</strong> of production traffic. SDK: <code>braintrust</code> (Python &amp; TypeScript). It wraps the OpenAI client pattern to enable zero-friction instrumentation.</p>
+
+    <div class="code-block">
+        <div class="code-header">braintrust &mdash; offline experiment</div>
+<pre><code><span class="kw">import</span> <span class="type">braintrust</span>
+<span class="kw">from</span> <span class="type">braintrust</span> <span class="kw">import</span> <span class="fn">Eval</span>
+<span class="kw">from</span> <span class="type">autoevals</span> <span class="kw">import</span> <span class="fn">Factuality</span>, <span class="fn">Battle</span>  <span class="cm"># braintrust's scorer lib</span>
+
+<span class="kw">await</span> <span class="fn">Eval</span>(
+    <span class="str">"my-project"</span>,
+    data=<span class="kw">lambda</span>: [
+        {<span class="str">"input"</span>: <span class="str">"Explain RLHF"</span>, <span class="str">"expected"</span>: <span class="str">"reinforcement learning from human feedback..."</span>},
+    ],
+    task=<span class="kw">lambda</span> x: anthropic_client.<span class="fn">complete</span>(x[<span class="str">"input"</span>]),
+    scores=[<span class="fn">Factuality</span>, <span class="fn">Battle</span>],
+    experiment_name=<span class="str">"claude-3-5-sonnet-v2"</span>,
+)</code></pre>
+    </div>
+
+    <h3>Online eval (production tracing)</h3>
+    <div class="code-block">
+        <div class="code-header">braintrust &mdash; production span logging</div>
+<pre><code><span class="kw">with</span> braintrust.<span class="fn">start_span</span>(<span class="str">"query"</span>) <span class="kw">as</span> span:
+    response = client.<span class="fn">chat_completions_create</span>(...)
+    span.<span class="fn">log</span>(
+        input=user_query,
+        output=response.content,
+        expected=None,  <span class="cm"># filled later by human review</span>
+        scores={<span class="str">"latency_ms"</span>: response.<span class="fn">latency</span>()},
+    )</code></pre>
+    </div>
+
+    <p>Braintrust stores traces in its hosted backend. Experiment results are versioned and diffed automatically against the baseline experiment. The UI shows score distributions, regressions highlighted in red, and allows human annotators to add labels directly in the browser.</p>
+
+    <div class="callout">
+        <div class="callout-label">autoevals library</div>
+        <p><code>autoevals</code> (open-source, bundled with Braintrust) provides <code>Factuality</code>, <code>Battle</code>, <code>ClosedQA</code>, <code>Summary</code>, <code>Moderation</code>, <code>SQLScorer</code> and more, all as composable callables with known calibration data. Can be used standalone without Braintrust cloud.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-04">
+    <div class="slide-number">04</div>
+    <h2>Phoenix (Arize) &mdash; OSS, OTel-Native, Trace &amp; Eval</h2>
+    <p>Arize Phoenix (<code>arize-phoenix</code> v4+) is an open-source, <strong>OpenTelemetry-native</strong> observability + eval platform. It stores traces in a local SQLite or Postgres database and exposes a browser UI on <code>localhost:6006</code> by default. No cloud account required.</p>
+
+    <div class="code-block">
+        <div class="code-header">phoenix &mdash; instrument an Anthropic client</div>
+<pre><code><span class="kw">import</span> <span class="type">phoenix</span> <span class="kw">as</span> px
+<span class="kw">from</span> <span class="type">openinference.instrumentation.anthropic</span> <span class="kw">import</span> <span class="type">AnthropicInstrumentor</span>
+<span class="kw">from</span> <span class="type">opentelemetry</span> <span class="kw">import</span> trace
+<span class="kw">from</span> <span class="type">opentelemetry.sdk.trace</span> <span class="kw">import</span> <span class="type">TracerProvider</span>
+<span class="kw">from</span> <span class="type">opentelemetry.exporter.otlp.proto.http.trace_exporter</span> <span class="kw">import</span> <span class="type">OTLPSpanExporter</span>
+
+px.<span class="fn">launch_app</span>()  <span class="cm"># starts local UI at http://localhost:6006</span>
+
+provider = <span class="type">TracerProvider</span>()
+provider.<span class="fn">add_span_processor</span>(
+    <span class="type">SimpleSpanProcessor</span>(<span class="type">OTLPSpanExporter</span>(endpoint=<span class="str">"http://localhost:6006/v1/traces"</span>))
+)
+trace.<span class="fn">set_tracer_provider</span>(provider)
+<span class="type">AnthropicInstrumentor</span>().<span class="fn">instrument</span>()  <span class="cm"># auto-traces all anthropic calls</span></code></pre>
+    </div>
+
+    <h3>Running evals on collected traces</h3>
+    <div class="code-block">
+        <div class="code-header">phoenix &mdash; LLM-as-judge on trace dataset</div>
+<pre><code><span class="kw">from</span> <span class="type">phoenix.evals</span> <span class="kw">import</span> <span class="fn">llm_classify</span>, <span class="type">OpenAIModel</span>
+<span class="kw">import</span> <span class="type">pandas</span> <span class="kw">as</span> pd
+
+traces_df = px.<span class="fn">Client</span>().<span class="fn">get_spans_dataframe</span>()  <span class="cm"># pull from local store</span>
+eval_df = <span class="fn">llm_classify</span>(
+    dataframe=traces_df,
+    model=<span class="type">OpenAIModel</span>(model=<span class="str">"gpt-4o"</span>),
+    template=<span class="str">"hallucination"</span>,  <span class="cm"># built-in template</span>
+    rails=[<span class="str">"factual"</span>, <span class="str">"hallucinated"</span>],
+    concurrency=<span class="num">10</span>,
+)</code></pre>
+    </div>
+
+    <div class="callout">
+        <div class="callout-label">OTel semantic conventions</div>
+        <p>Phoenix uses the <strong>OpenInference</strong> semantic conventions (<code>openinference-semantic-conventions</code> package) to define span attributes like <code>llm.input_messages</code>, <code>llm.output_messages</code>, <code>llm.token_count.total</code>. These are a superset of the upstream OTel semantic conventions for GenAI. Any instrumentation library that emits OpenInference spans works with Phoenix out of the box, including <code>openinference-instrumentation-langchain</code> and <code>-llamaindex</code>.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-05">
+    <div class="slide-number">05</div>
+    <h2>Langfuse &mdash; Observability &amp; Eval Bundled</h2>
+    <p>Langfuse (<code>langfuse</code> v2+) is an open-source (MIT) LLM observability + eval platform. Self-hostable via Docker Compose or available as a managed cloud. Its data model uses <strong>traces</strong> &rarr; <strong>spans</strong> &rarr; <strong>observations</strong> (hierarchical), with first-class <strong>scores</strong> attached to any node.</p>
+
+    <div class="code-block">
+        <div class="code-header">langfuse &mdash; tracing + scoring</div>
+<pre><code><span class="kw">from</span> <span class="type">langfuse</span> <span class="kw">import</span> <span class="type">Langfuse</span>
+<span class="kw">from</span> <span class="type">langfuse.decorators</span> <span class="kw">import</span> <span class="fn">observe</span>, <span class="fn">langfuse_context</span>
+
+lf = <span class="type">Langfuse</span>(public_key=<span class="str">"..."</span>, secret_key=<span class="str">"..."</span>, host=<span class="str">"https://cloud.langfuse.com"</span>)
+
+<span class="fn">@observe</span>()
+<span class="kw">def</span> <span class="fn">run_pipeline</span>(question: <span class="type">str</span>) -&gt; <span class="type">str</span>:
+    answer = anthropic_client.<span class="fn">complete</span>(question)
+    <span class="cm"># Attach an inline score &mdash; e.g. from a fast classifier</span>
+    langfuse_context.<span class="fn">score_current_observation</span>(
+        name=<span class="str">"toxicity"</span>,
+        value=toxicity_classifier.<span class="fn">score</span>(answer),
+        data_type=<span class="str">"NUMERIC"</span>,
+    )
+    <span class="kw">return</span> answer</code></pre>
+    </div>
+
+    <h3>Eval-specific features</h3>
+    <ul>
+        <li><strong>Dataset versioning</strong> &mdash; create eval datasets in the UI; link dataset items to trace observations for side-by-side comparison.</li>
+        <li><strong>LLM-as-judge integration</strong> &mdash; define judge prompts in the UI; Langfuse runs them asynchronously against sampled traces without touching your application code.</li>
+        <li><strong>Human annotation queues</strong> &mdash; route uncertain-score items to a named annotation queue; annotators work in the browser; scores written back to the trace.</li>
+        <li><strong>Prompt management</strong> &mdash; versioned prompt registry with A/B testing support; links prompt version to trace for regression attribution.</li>
+    </ul>
+
+    <div class="callout">
+        <div class="callout-label">Self-hosting vs cloud</div>
+        <p>Self-host with <code>docker compose up</code> using the official <code>langfuse/langfuse</code> image. Requires Postgres (included in compose). For production, add Redis for queue. Data stays on-prem. The cloud version adds managed infra and SOC 2 compliance. Both use the same SDK; switch by changing the <code>host</code> parameter.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-06">
+    <div class="slide-number">06</div>
+    <h2>OpenAI Evals &mdash; Model-Graded, Simple Harness</h2>
+    <p>The <code>evals</code> library (<code>github.com/openai/evals</code>, Python &ge; 3.9) is OpenAI's own eval harness. It is intentionally minimal: YAML task definitions, a registry-based runner, and a set of built-in model-graded eval types. No UI; output is jsonl log files.</p>
+
+    <div class="code-block">
+        <div class="code-header">evals &mdash; YAML task definition</div>
+<pre><code><span class="cm"># evals/registry/evals/my_factual_eval.yaml</span>
+<span class="type">my_factual_eval</span><span class="kw">:</span>
+  <span class="type">id</span><span class="kw">:</span> <span class="str">my_factual_eval.v1</span>
+  <span class="type">description</span><span class="kw">:</span> <span class="str">Factual QA on LLM architecture topics</span>
+  <span class="type">metrics</span><span class="kw">:</span> [<span class="str">accuracy</span>]
+
+<span class="type">my_factual_eval.v1</span><span class="kw">:</span>
+  <span class="type">class</span><span class="kw">:</span> <span class="str">evals.elsuite.modelgraded.classify:ModelBasedClassify</span>
+  <span class="type">args</span><span class="kw">:</span>
+    <span class="type">samples_jsonl</span><span class="kw">:</span> <span class="str">evals/registry/data/my_factual/samples.jsonl</span>
+    <span class="type">eval_type</span><span class="kw">:</span> <span class="str">fact</span>
+    <span class="type">modelgraded_spec</span><span class="kw">:</span> <span class="str">fact</span></code></pre>
+    </div>
+
+    <div class="code-block">
+        <div class="code-header">Running an eval</div>
+<pre><code><span class="cm"># Run against gpt-4o</span>
+oaieval gpt-4o my_factual_eval
+
+<span class="cm"># Run against a completions endpoint (custom model)</span>
+oaieval gpt-4o my_factual_eval \
+  --completion_fn <span class="str">langchain/chat_anthropic:claude-3-5-sonnet-20241022"</span></code></pre>
+    </div>
+
+    <h3>Built-in eval types</h3>
+    <div class="diagram-grid cols-2">
+        <div class="diagram-panel accent-border">
+            <h4>Model-graded types</h4>
+            <ul>
+                <li><code>fact</code> &mdash; is the answer factually consistent?</li>
+                <li><code>closedqa</code> &mdash; does the answer satisfy the question?</li>
+                <li><code>battle</code> &mdash; pairwise preference</li>
+                <li><code>classify</code> &mdash; classifies response into a set of labels</li>
+            </ul>
+        </div>
+        <div class="diagram-panel accent-border">
+            <h4>Deterministic types</h4>
+            <ul>
+                <li><code>match</code> &mdash; exact string match</li>
+                <li><code>includes</code> &mdash; substring present</li>
+                <li><code>fuzzy_match</code> &mdash; ROUGE-L above threshold</li>
+                <li>Custom: subclass <code>evals.eval.Eval</code></li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<section class="slide" id="slide-07">
+    <div class="slide-number">07</div>
+    <h2>deepeval &mdash; Pytest-Style Assertions</h2>
+    <p>deepeval (<code>deepeval</code> v1+, Python &ge; 3.8) integrates LLM eval into the standard pytest workflow. The key abstraction is a <strong>metric</strong> object that you assert against, just like a standard assertion in a unit test. It runs inside <code>pytest</code>, reports pass/fail per test case, and integrates with CI via <code>pytest --tb=short</code>.</p>
+
+    <div class="code-block">
+        <div class="code-header">deepeval &mdash; pytest integration</div>
+<pre><code><span class="kw">import</span> <span class="type">pytest</span>
+<span class="kw">from</span> <span class="type">deepeval</span> <span class="kw">import</span> <span class="fn">assert_test</span>
+<span class="kw">from</span> <span class="type">deepeval.test_case</span> <span class="kw">import</span> <span class="type">LLMTestCase</span>
+<span class="kw">from</span> <span class="type">deepeval.metrics</span> <span class="kw">import</span> (
+    <span class="type">AnswerRelevancyMetric</span>,
+    <span class="type">FaithfulnessMetric</span>,
+    <span class="type">HallucinationMetric</span>,
+    <span class="type">GEval</span>,
+)
+
+<span class="fn">@pytest.mark.parametrize</span>(<span class="str">"test_case"</span>, load_dataset(<span class="str">"rag_qa.jsonl"</span>))
+<span class="kw">def</span> <span class="fn">test_rag_pipeline</span>(test_case):
+    tc = <span class="type">LLMTestCase</span>(
+        input=test_case[<span class="str">"query"</span>],
+        actual_output=rag_pipeline.<span class="fn">query</span>(test_case[<span class="str">"query"</span>]),
+        retrieval_context=test_case[<span class="str">"context_chunks"</span>],
+        expected_output=test_case[<span class="str">"expected"</span>],
+    )
+    <span class="fn">assert_test</span>(tc, metrics=[
+        <span class="type">AnswerRelevancyMetric</span>(threshold=<span class="num">0.7</span>),   <span class="cm"># is answer relevant to query?</span>
+        <span class="type">FaithfulnessMetric</span>(threshold=<span class="num">0.8</span>),      <span class="cm"># is answer faithful to context?</span>
+        <span class="type">HallucinationMetric</span>(threshold=<span class="num">0.1</span>),    <span class="cm"># hallucination rate &lt; 10%</span>
+    ])</code></pre>
+    </div>
+
+    <h3>Notable metrics</h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Metric class</th><th>What it measures</th><th>Uses LLM judge</th></tr></thead>
+            <tbody>
+                <tr><td><code>AnswerRelevancyMetric</code></td><td>Is the output relevant to the input?</td><td>Yes (GPT-4o or configurable)</td></tr>
+                <tr><td><code>FaithfulnessMetric</code></td><td>Are all claims in output grounded in retrieval context?</td><td>Yes</td></tr>
+                <tr><td><code>HallucinationMetric</code></td><td>Fraction of output claims that are hallucinated</td><td>Yes</td></tr>
+                <tr><td><code>ContextualRecallMetric</code></td><td>Fraction of expected answer covered by retrieval</td><td>Yes</td></tr>
+                <tr><td><code>GEval</code></td><td>Custom rubric-based eval &mdash; define your own criteria</td><td>Yes (configurable)</td></tr>
+                <tr><td><code>ToxicityMetric</code></td><td>Toxicity score via Detoxify or judge</td><td>Optional</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="slide" id="slide-08">
+    <div class="slide-number">08</div>
+    <h2>Picking a Framework &mdash; Decision Matrix</h2>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Requirement</th>
+                    <th>Inspect AI</th>
+                    <th>Braintrust</th>
+                    <th>Phoenix</th>
+                    <th>Langfuse</th>
+                    <th>OAI Evals</th>
+                    <th>deepeval</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Safety / capability red-team evals</td>
+                    <td><span class="badge ok">best</span></td>
+                    <td><span class="badge warn">partial</span></td>
+                    <td><span class="badge warn">partial</span></td>
+                    <td><span class="badge warn">partial</span></td>
+                    <td><span class="badge warn">partial</span></td>
+                    <td><span class="badge warn">partial</span></td>
+                </tr>
+                <tr>
+                    <td>Agent / sandboxed tool evals</td>
+                    <td><span class="badge ok">best</span></td>
+                    <td><span class="badge bad">no</span></td>
+                    <td><span class="badge bad">no</span></td>
+                    <td><span class="badge bad">no</span></td>
+                    <td><span class="badge bad">no</span></td>
+                    <td><span class="badge bad">no</span></td>
+                </tr>
+                <tr>
+                    <td>Production tracing + online eval</td>
+                    <td><span class="badge bad">no</span></td>
+                    <td><span class="badge ok">best</span></td>
+                    <td><span class="badge ok">strong</span></td>
+                    <td><span class="badge ok">strong</span></td>
+                    <td><span class="badge bad">no</span></td>
+                    <td><span class="badge bad">no</span></td>
+                </tr>
+                <tr>
+                    <td>Self-hostable / on-prem</td>
+                    <td><span class="badge ok">yes</span></td>
+                    <td><span class="badge bad">cloud only</span></td>
+                    <td><span class="badge ok">yes</span></td>
+                    <td><span class="badge ok">yes</span></td>
+                    <td><span class="badge ok">yes</span></td>
+                    <td><span class="badge ok">yes</span></td>
+                </tr>
+                <tr>
+                    <td>CI / pytest integration</td>
+                    <td><span class="badge warn">CLI only</span></td>
+                    <td><span class="badge warn">SDK</span></td>
+                    <td><span class="badge warn">SDK</span></td>
+                    <td><span class="badge warn">SDK</span></td>
+                    <td><span class="badge warn">CLI</span></td>
+                    <td><span class="badge ok">best</span></td>
+                </tr>
+                <tr>
+                    <td>OTel-native traces</td>
+                    <td><span class="badge bad">no</span></td>
+                    <td><span class="badge warn">OTLP adapter</span></td>
+                    <td><span class="badge ok">native</span></td>
+                    <td><span class="badge warn">OTLP adapter</span></td>
+                    <td><span class="badge bad">no</span></td>
+                    <td><span class="badge bad">no</span></td>
+                </tr>
+                <tr>
+                    <td>Human annotation workflow</td>
+                    <td><span class="badge warn">viewer only</span></td>
+                    <td><span class="badge ok">strong</span></td>
+                    <td><span class="badge warn">basic</span></td>
+                    <td><span class="badge ok">strong</span></td>
+                    <td><span class="badge bad">no</span></td>
+                    <td><span class="badge bad">no</span></td>
+                </tr>
+                <tr>
+                    <td>Open-source / free tier</td>
+                    <td><span class="badge ok">full OSS</span></td>
+                    <td><span class="badge warn">free tier</span></td>
+                    <td><span class="badge ok">full OSS</span></td>
+                    <td><span class="badge ok">OSS + cloud</span></td>
+                    <td><span class="badge ok">full OSS</span></td>
+                    <td><span class="badge ok">OSS + cloud</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="callout">
+        <div class="callout-label">Common stack combinations</div>
+        <p><strong>Safety team:</strong> Inspect AI for structured evals + Langfuse for production traces. <strong>MLOps / production team:</strong> Langfuse or Braintrust for traces + deepeval in CI. <strong>Research team:</strong> Inspect AI standalone. <strong>Data-privacy-constrained:</strong> Phoenix + deepeval, fully self-hosted with zero external calls.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-09">
+    <div class="slide-number">09</div>
+    <h2>What to Take Away</h2>
+    <ul>
+        <li><strong>No single framework covers everything.</strong> Offline capability evals (Inspect AI), production tracing (Langfuse/Braintrust/Phoenix), and CI regression (deepeval) address different parts of the eval lifecycle.</li>
+        <li><strong>Inspect AI is the safety benchmark standard.</strong> If you need reproducible, sandboxed, government-grade capability evals, it is the current best-in-class.</li>
+        <li><strong>Phoenix is the OTel-native choice.</strong> If your stack already emits OTel traces, Phoenix adds eval with zero additional instrumentation.</li>
+        <li><strong>Langfuse + deepeval is the practical OSS stack</strong> for teams wanting production monitoring and CI regression gating without cloud vendor lock-in.</li>
+        <li><strong>Braintrust excels at experiment tracking</strong> and is the easiest tool to get pairwise eval results into a shared UI quickly.</li>
+        <li><strong>deepeval in pytest</strong> is the lowest-friction path to getting LLM quality gates into an existing CI/CD pipeline &mdash; no new infrastructure needed.</li>
+        <li><strong>OTel matters long-term.</strong> The industry is converging on OpenTelemetry for LLM observability. Pick tools that emit or consume OTLP to stay migration-safe.</li>
+    </ul>
+
+    <div class="callout">
+        <div class="callout-label">Where to next</div>
+        <p>Deck 04 moves to production evals: online sampling strategies, drift detection, golden-set versioning, regression CI configuration, and building the feedback loop from thumbs-up/down signals into structured eval data.</p>
+    </div>
+</section>
+
+<footer class="footer">
+    <p>Part of the <a href="https://github.com/BrendanJamesLynskey/LLM_Hub_Evaluations">LLM Evaluations sub-hub</a></p>
+    <p style="margin-top: 0.5rem; font-size: 0.8rem;"><a href="https://github.com/BrendanJamesLynskey/LLM_Hub_Evaluations">Back to Series Index</a></p>
+</footer>
+<script>
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    });
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.slide').forEach(slide => {
+        slide.style.opacity = '0';
+        slide.style.transform = 'translateY(30px)';
+        slide.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+        observer.observe(slide);
+    });
+</script>
+</body>
+</html>
